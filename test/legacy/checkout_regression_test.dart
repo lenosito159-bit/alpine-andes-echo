@@ -28,7 +28,7 @@ void main() {
     expect((await cart.addProduct(product, quantity: 0)).isLeft(), isTrue);
     expect((await cart.addProduct(product, quantity: 3)).isRight(), isTrue);
     expect((await cart.addProduct(product, quantity: 2)).isLeft(), isTrue);
-    expect((await cart.getItems()).getOrElse(() => []).single.quantity, 3);
+    expect((await cart.getItems()).getOrElse((_) => []).single.quantity, 3);
   });
 
   test('refuses a stale screen total and retains the cart', () async {
@@ -39,7 +39,7 @@ void main() {
         .execute(Payment.cash(totalAmount: 1, amountReceived: 1));
     expect(result.isLeft(), isTrue);
     verifyNever(() => sales.createSale(any()));
-    expect((await cart.getItems()).getOrElse(() => []), hasLength(1));
+    expect((await cart.getItems()).getOrElse((_) => []), hasLength(1));
   });
 
   test('propagates a total-read failure instead of recording a zero sale', () async {
@@ -72,7 +72,7 @@ void main() {
     saved.complete(right(sale));
     expect((await first).isRight(), isTrue);
     verify(() => sales.createSale(any())).called(1);
-    expect((await cart.getItems()).getOrElse(() => []), isEmpty);
+    expect((await cart.getItems()).getOrElse((_) => []), isEmpty);
   });
 
   test('keeps cart when durable sale storage fails', () async {
@@ -83,6 +83,6 @@ void main() {
     final result = await ProcessPayment(checkoutRepository: sales, cartRepository: cart)
         .execute(Payment.cash(totalAmount: 9.5, amountReceived: 20));
     expect(result.isLeft(), isTrue);
-    expect((await cart.getItems()).getOrElse(() => []), hasLength(1));
+    expect((await cart.getItems()).getOrElse((_) => []), hasLength(1));
   });
 }

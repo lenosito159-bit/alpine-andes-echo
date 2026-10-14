@@ -63,7 +63,7 @@ class InMemoryCartRepository implements ICartRepository {
     try {
       if (_discountIsPercentage) {
         final subtotalResult = await getSubtotal();
-        final subtotal = subtotalResult.getOrElse(() => 0.0);
+        final subtotal = subtotalResult.getOrElse((_) => 0.0);
         return right(subtotal * (_discount / 100));
       }
       return right(_discount);
@@ -81,8 +81,8 @@ class InMemoryCartRepository implements ICartRepository {
       final subtotalResult = await getSubtotal();
       final discountResult = await getDiscount();
 
-      final subtotal = subtotalResult.getOrElse(() => 0.0);
-      final discount = discountResult.getOrElse(() => 0.0);
+      final subtotal = subtotalResult.getOrElse((_) => 0.0);
+      final discount = discountResult.getOrElse((_) => 0.0);
 
       final total = subtotal - discount;
       return right(total < 0 ? 0.0 : total);

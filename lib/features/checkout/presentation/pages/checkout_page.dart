@@ -1,3 +1,4 @@
+import 'package:zivlo/features/checkout/application/usecases/get_checkout_summary.dart' as checkout_dto;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -93,16 +94,16 @@ class CheckoutPage extends StatelessWidget {
   }
 
   Widget _buildSummarySection(BuildContext context, CheckoutState state) {
-    CheckoutSummaryData? summary;
+    checkout_dto.CheckoutSummary? summary;
 
     if (state is CheckoutReady) {
-      summary = CheckoutSummaryData.fromSummary(state.summary);
+      summary = state.summary;
     } else if (state is CashPaymentState) {
-      summary = CheckoutSummaryData.fromSummary(state.summary);
+      summary = state.summary;
     } else if (state is CardPaymentState) {
-      summary = CheckoutSummaryData.fromSummary(state.summary);
+      summary = state.summary;
     } else if (state is MixedPaymentState) {
-      summary = CheckoutSummaryData.fromSummary(state.summary);
+      summary = state.summary;
     }
 
     if (summary == null) {
@@ -163,7 +164,7 @@ class CheckoutPage extends StatelessWidget {
 
     if (state is CashPaymentState) {
       return CashPaymentSection(
-        summary: CheckoutSummaryData.fromSummary(state.summary),
+        summary: state.summary,
         cashAmount: state.cashAmount,
         change: state.change,
         isValid: state.isValid,
@@ -179,7 +180,7 @@ class CheckoutPage extends StatelessWidget {
 
     if (state is CardPaymentState) {
       return CardPaymentSection(
-        summary: CheckoutSummaryData.fromSummary(state.summary),
+        summary: state.summary,
         onConfirmPayment: () {
           context.read<CheckoutBloc>().add(const ProcessPaymentRequested());
         },
@@ -188,7 +189,7 @@ class CheckoutPage extends StatelessWidget {
 
     if (state is MixedPaymentState) {
       return MixedPaymentSection(
-        summary: CheckoutSummaryData.fromSummary(state.summary),
+        summary: state.summary,
         cashAmount: state.cashAmount,
         cardAmount: state.cardAmount,
         remainingAmount: state.remainingAmount,

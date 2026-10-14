@@ -38,9 +38,9 @@ jobs:
           python3 - <<'PY'
           import os
           from pathlib import Path
-          for line in Path(os.environ['RUNNER_TEMP'], 'zivlo-analyze.log').read_text().splitlines():
-              if line.strip().startswith('error '):
-                  print('::error::' + line.replace('%', '%25').replace('\r', '%0D'))
+          errors = [line for line in Path(os.environ['RUNNER_TEMP'], 'zivlo-analyze.log').read_text().splitlines() if line.strip().startswith('error ')]
+          if errors:
+              print('::error::' + '\n'.join(errors).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
           PY
           exit "$result"
       - name: Validate before packaging
