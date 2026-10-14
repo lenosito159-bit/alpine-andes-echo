@@ -30,9 +30,34 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos --no-fatal-warnings > "$RUNNER_TEMP/zivlo-analyze.log" 2>&1
+          result=$?
+          cat "$RUNNER_TEMP/zivlo-analyze.log"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          for line in Path(os.environ['RUNNER_TEMP'], 'zivlo-analyze.log').read_text().splitlines():
+              if line.strip().startswith('error '):
+                  print('::error::' + line.replace('%', '%25').replace('\r', '%0D'))
+          PY
+          exit "$result"
       - name: Validate before packaging
-        run: flutter test
+        run: |
+          set +e
+          flutter test --reporter expanded > "$RUNNER_TEMP/zivlo-tests.log" 2>&1
+          result=$?
+          cat "$RUNNER_TEMP/zivlo-tests.log"
+          if [ "$result" -ne 0 ]; then
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = Path(os.environ['RUNNER_TEMP'], 'zivlo-tests.log').read_text().splitlines()[-100:]
+          print('::error::' + '\n'.join(lines).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PY
+          fi
+          exit "$result"
       - name: Build debug APK for testing
         run: flutter build apk --debug
       - name: Checksum
