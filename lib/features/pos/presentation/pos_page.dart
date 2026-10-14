@@ -53,7 +53,7 @@ class _PosPageState extends State<PosPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),
       backgroundColor: error ? const Color(0xFF8C342B) : _green,
-      behavior: SnackBarBehavior.floating,
+      behavior: SnackBarBehavior.fixed,
     ));
   }
 
