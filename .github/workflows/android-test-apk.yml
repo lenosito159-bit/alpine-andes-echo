@@ -56,18 +56,29 @@ jobs:
           lines = Path(os.environ['RUNNER_TEMP'], 'zivlo-tests.log').read_text().splitlines()[-100:]
           print('::error::' + '\n'.join(lines).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
           PY
+          else
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = Path(os.environ['RUNNER_TEMP'], 'zivlo-tests.log').read_text().splitlines()
+          for line in lines[-5:]:
+              print('::notice::' + line.replace('%', '%25').replace('\r', '%0D'))
+          PY
           fi
           exit "$result"
       - name: Build debug APK for testing
         run: flutter build apk --debug
       - name: Checksum
         working-directory: build/app/outputs/flutter-apk
-        run: sha256sum app-debug.apk > app-debug.apk.sha256
+        run: |
+          sha256sum app-debug.apk > app-debug.apk.sha256
+          echo "::notice::APK generated: $(stat -c '%s' app-debug.apk) bytes; $(cat app-debug.apk.sha256)"
       - uses: actions/upload-artifact@v4
         with:
           name: zivlo-peru-debug-apk
           path: |
             build/app/outputs/flutter-apk/app-debug.apk
             build/app/outputs/flutter-apk/app-debug.apk.sha256
+            pubspec.lock
           if-no-files-found: error
           retention-days: 14
