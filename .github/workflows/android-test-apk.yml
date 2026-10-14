@@ -73,6 +73,23 @@ jobs:
         run: |
           sha256sum app-debug.apk > app-debug.apk.sha256
           echo "::notice::APK generated: $(stat -c '%s' app-debug.apk) bytes; $(cat app-debug.apk.sha256)"
+      - name: Enable emulator acceleration
+        run: sudo chmod a+rw /dev/kvm
+      - name: Install and open the APK offline on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          disable-animations: true
+          script: bash scripts/test-apk.sh
+      - name: Save Android runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zivlo-android-smoke-evidence
+          path: build/apk-smoke/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: zivlo-peru-debug-apk

@@ -202,7 +202,7 @@ class _ScannerPageState extends State<ScannerPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons.camera_alt_off,
+              Icons.no_photography,
               size: 64,
               color: AppColors.colorError,
             ),
