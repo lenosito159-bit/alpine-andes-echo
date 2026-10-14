@@ -54,7 +54,7 @@ jobs:
           import os
           from pathlib import Path
           lines = Path(os.environ['RUNNER_TEMP'], 'zivlo-tests.log').read_text().splitlines()
-          markers = ['following assertion', 'following _', 'following message', 'Expected:', 'Actual:', '[E]', 'Error:', 'Exception:']
+          markers = ['following ', 'Expected:', 'Actual:', '[E]', 'Error:', 'Exception:', 'Warning:']
           details = []
           for i, line in enumerate(lines):
               if any(marker in line for marker in markers):
