@@ -48,7 +48,7 @@ class ProcessPayment {
       if (cartItemsResult.isLeft()) {
         return left(cartItemsResult.getLeft().toNullable()!);
       }
-      final cartItems = cartItemsResult.getOrElse(() => []);
+      final cartItems = cartItemsResult.getOrElse((_) => []);
 
       if (cartItems.isEmpty) {
         return left(const CartOperationFailure('empty_cart', 
@@ -63,9 +63,9 @@ class ProcessPayment {
       for (final result in [subtotalResult, discountResult, totalResult]) {
         if (result.isLeft()) return left(result.getLeft().toNullable()!);
       }
-      final subtotal = subtotalResult.getOrElse(() => throw StateError('Missing subtotal'));
-      final discount = discountResult.getOrElse(() => throw StateError('Missing discount'));
-      final total = totalResult.getOrElse(() => throw StateError('Missing total'));
+      final subtotal = subtotalResult.getOrElse((_) => throw StateError('Missing subtotal'));
+      final discount = discountResult.getOrElse((_) => throw StateError('Missing discount'));
+      final total = totalResult.getOrElse((_) => throw StateError('Missing total'));
       if (![subtotal, discount, total].every((value) => value.isFinite && value >= 0)) {
         return left(const PaymentValidationFailure('El carrito contiene importes inválidos'));
       }

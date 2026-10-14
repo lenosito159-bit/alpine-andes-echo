@@ -51,7 +51,7 @@ class CreateProduct {
       final existing = await repository.getByBarcode(product.barcode!);
 
       if (existing.isLeft()) return left(existing.getLeft().toNullable()!);
-      if (existing.getOrElse(() => null) != null) {
+      if (existing.getOrElse((_) => null) != null) {
         return left(const CartOperationFailure('create_product', message: 'El código de barras ya existe'));
       }
     }
@@ -78,11 +78,11 @@ class UpdateProduct {
     final existing = await repository.getById(product.id);
 
     if (existing.isLeft()) return left(existing.getLeft().toNullable()!);
-    if (existing.getOrElse(() => null) == null) return left(ProductNotFound(product.id));
+    if (existing.getOrElse((_) => null) == null) return left(ProductNotFound(product.id));
     if (product.barcode != null && product.barcode!.trim().isNotEmpty) {
       final duplicate = await repository.getByBarcode(product.barcode!);
       if (duplicate.isLeft()) return left(duplicate.getLeft().toNullable()!);
-      final match = duplicate.getOrElse(() => null);
+      final match = duplicate.getOrElse((_) => null);
       if (match != null && match.id != product.id) {
         return left(const CartOperationFailure('update_product', message: 'El código de barras ya existe'));
       }
@@ -108,7 +108,7 @@ class DeleteProduct {
     final existing = await repository.getById(id);
 
     if (existing.isLeft()) return left(existing.getLeft().toNullable()!);
-    if (existing.getOrElse(() => null) == null) return left(ProductNotFound(id));
+    if (existing.getOrElse((_) => null) == null) return left(ProductNotFound(id));
     return repository.deleteById(id);
   }
 }

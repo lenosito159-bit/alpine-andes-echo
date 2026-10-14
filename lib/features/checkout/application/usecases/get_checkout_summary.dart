@@ -81,16 +81,16 @@ class GetCheckoutSummary {
         return left(CartOperationFailure('get_items',
           message: 'Failed to get cart items for summary'));
       }
-      final items = itemsResult.getOrElse(() => []);
+      final items = itemsResult.getOrElse((_) => []);
 
       // Get totals
       final subtotalResult = await cartRepository.getSubtotal();
       final discountResult = await cartRepository.getDiscount();
       final totalResult = await cartRepository.getTotal();
 
-      final subtotal = subtotalResult.getOrElse(() => 0.0);
-      final discount = discountResult.getOrElse(() => 0.0);
-      final total = totalResult.getOrElse(() => 0.0);
+      final subtotal = subtotalResult.getOrElse((_) => 0.0);
+      final discount = discountResult.getOrElse((_) => 0.0);
+      final total = totalResult.getOrElse((_) => 0.0);
 
       // Calculate total quantity
       final totalQuantity = items.fold<int>(
