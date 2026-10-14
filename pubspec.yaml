@@ -1,11 +1,11 @@
 name: zivlo
 description: Punto de venta offline-first para pequeños comercios en Latinoamérica
 publish_to: 'none'
-version: 1.1.0+1
+version: 1.2.0+2
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
-  flutter: '>=3.10.0'
+  sdk: '>=3.7.0 <4.0.0'
+  flutter: '>=3.29.3'
 
 dependencies:
   flutter:
@@ -17,6 +17,14 @@ dependencies:
 
   # Base de datos local - Hive
   hive_flutter: ^1.1.0
+  sqflite: 2.4.2
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  crypto: ^3.0.6
+  file_picker: 8.3.7
+  share_plus: 10.1.4
+  pdf: 3.11.3
+  printing: 5.14.2
 
   # Navegación - GoRouter
   go_router: ^13.2.0
@@ -52,6 +60,7 @@ dev_dependencies:
   # Testing - sin conflictos con Hive
   bloc_test: ^9.1.5
   mocktail: ^1.0.2
+  sqflite_common_ffi: 2.3.5
 
   # Linting
   flutter_lints: ^3.0.1
@@ -59,9 +68,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  assets:
-    - assets/images/
-    - assets/fonts/
 
   # Fonts - commented out until font files are added
   # fonts:

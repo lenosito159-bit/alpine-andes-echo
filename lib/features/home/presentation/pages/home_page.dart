@@ -90,7 +90,7 @@ class HomePage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: ExtendedFloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           context.push('/scanner');
         },

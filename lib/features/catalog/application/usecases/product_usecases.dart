@@ -9,9 +9,7 @@ import 'package:zivlo/features/catalog/domain/repositories/product_repository.da
 /// Retrieves a product from the repository using its barcode
 class GetProductByBarcode {
   final IProductRepository repository;
-  final Uuid _uuid;
-
-  const GetProductByBarcode(this.repository, {Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  const GetProductByBarcode(this.repository, {Uuid? uuid});
 
   Future<Either<Failure, Product?>> execute(String barcode) async {
     // Validate barcode is not empty
@@ -40,9 +38,7 @@ class GetAllProducts {
 /// Creates a new product in the repository
 class CreateProduct {
   final IProductRepository repository;
-  final Uuid _uuid;
-
-  const CreateProduct(this.repository, {Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  const CreateProduct(this.repository, {Uuid? uuid});
 
   Future<Either<Failure, Product>> execute(Product product) async {
     // Validate product
@@ -54,15 +50,10 @@ class CreateProduct {
     if (product.barcode != null && product.barcode!.trim().isNotEmpty) {
       final existing = await repository.getByBarcode(product.barcode!);
 
-      return existing.fold(
-        (failure) => Left(failure),
-        (productFound) {
-          if (productFound != null) {
-            return Left(const ProductNotFound('barcode already exists'));
-          }
-          return Right(product);
-        },
-      );
+      if (existing.isLeft()) return left(existing.getLeft().toNullable()!);
+      if (existing.getOrElse(() => null) != null) {
+        return left(const CartOperationFailure('create_product', message: 'El código de barras ya existe'));
+      }
     }
 
     // Create product
@@ -86,15 +77,17 @@ class UpdateProduct {
     // Check if product exists
     final existing = await repository.getById(product.id);
 
-    return existing.fold(
-      (failure) => Left(failure),
-      (productFound) {
-        if (productFound == null) {
-          return Left(ProductNotFound(product.id));
-        }
-        return Right(product);
-      },
-    );
+    if (existing.isLeft()) return left(existing.getLeft().toNullable()!);
+    if (existing.getOrElse(() => null) == null) return left(ProductNotFound(product.id));
+    if (product.barcode != null && product.barcode!.trim().isNotEmpty) {
+      final duplicate = await repository.getByBarcode(product.barcode!);
+      if (duplicate.isLeft()) return left(duplicate.getLeft().toNullable()!);
+      final match = duplicate.getOrElse(() => null);
+      if (match != null && match.id != product.id) {
+        return left(const CartOperationFailure('update_product', message: 'El código de barras ya existe'));
+      }
+    }
+    return repository.update(product);
   }
 }
 
@@ -114,15 +107,9 @@ class DeleteProduct {
     // Check if product exists
     final existing = await repository.getById(id);
 
-    return existing.fold(
-      (failure) => Left(failure),
-      (productFound) {
-        if (productFound == null) {
-          return Left(ProductNotFound(id));
-        }
-        return right(unit);
-      },
-    );
+    if (existing.isLeft()) return left(existing.getLeft().toNullable()!);
+    if (existing.getOrElse(() => null) == null) return left(ProductNotFound(id));
+    return repository.deleteById(id);
   }
 }
 

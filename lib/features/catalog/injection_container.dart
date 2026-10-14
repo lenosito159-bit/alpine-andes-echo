@@ -1,4 +1,6 @@
 import 'package:get_it/get_it.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:zivlo/features/catalog/infrastructure/models/product_hive_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 // Domain - Repository
@@ -20,7 +22,7 @@ final GetIt sl = GetIt.instance;
 void initializeDependencies() {
   // Register Repository (LazySingleton - single instance)
   sl.registerLazySingleton<IProductRepository>(
-    () => HiveProductRepository(sl()),
+    () => HiveProductRepository(Hive.box<ProductHiveModel>('products')),
   );
   
   // Register Use Cases (LazySingleton - stateless)

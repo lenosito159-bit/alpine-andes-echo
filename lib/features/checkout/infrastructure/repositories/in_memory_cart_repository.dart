@@ -100,6 +100,12 @@ class InMemoryCartRepository implements ICartRepository {
     int quantity = 1,
   }) async {
     try {
+      if (quantity <= 0 || !product.price.isFinite || product.price < 0) {
+        return left(const CartOperationFailure('add_product', message: 'Cantidad o precio inválido'));
+      }
+      if (quantity > product.stock) {
+        return left(const CartOperationFailure('add_product', message: 'Stock insuficiente'));
+      }
       // Check if product is already in cart
       final existingItem = _items.values.firstWhere(
         (item) => item.product.id == product.id,
@@ -140,12 +146,14 @@ class InMemoryCartRepository implements ICartRepository {
       }
 
       if (quantity <= 0) {
-        await removeItem(itemId);
-        return left(CartOperationFailure('update_quantity',
-          message: 'Quantity must be positive - item removed'));
+        return left(const CartOperationFailure('update_quantity',
+          message: 'La cantidad debe ser positiva'));
       }
 
       final existingItem = _items[itemId]!;
+      if (quantity > existingItem.product.stock) {
+        return left(const CartOperationFailure('update_quantity', message: 'Stock insuficiente'));
+      }
       final updatedItem = existingItem.copyWith(quantity: quantity);
       _items[itemId] = updatedItem;
 
@@ -192,7 +200,7 @@ class InMemoryCartRepository implements ICartRepository {
     bool isPercentage = false,
   }) async {
     try {
-      if (discount < 0) {
+      if (!discount.isFinite || discount < 0) {
         return left(CartOperationFailure('apply_discount',
           message: 'Discount cannot be negative'));
       }

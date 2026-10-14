@@ -80,3 +80,17 @@ class ScannerFlashDisabled extends ScannerState {
   @override
   List<Object?> get props => [];
 }
+
+class ScannerAddingToCart extends ScannerState {
+  const ScannerAddingToCart();
+}
+
+class ScannerCartUpdated extends ScannerState {
+  final String productName;
+  final int quantity;
+
+  const ScannerCartUpdated(this.productName, this.quantity);
+
+  @override
+  List<Object?> get props => [productName, quantity];
+}

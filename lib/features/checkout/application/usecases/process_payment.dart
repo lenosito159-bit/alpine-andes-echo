@@ -1,5 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:uuid/uuid.dart';
+import 'validate_payment.dart';
 
 import 'package:zivlo/core/error/failures.dart';
 import 'package:zivlo/features/checkout/domain/entities/sale.dart';
@@ -23,7 +24,9 @@ class ProcessPayment {
   final ICartRepository cartRepository;
   final Uuid uuid;
 
-  const ProcessPayment({
+  bool _processing = false;
+
+  ProcessPayment({
     required this.checkoutRepository,
     required this.cartRepository,
     Uuid? uuid,
@@ -35,18 +38,15 @@ class ProcessPayment {
   /// 
   /// Returns [Sale] on success, [Failure] on error
   Future<Either<Failure, Sale>> execute(Payment payment) async {
-    // Validate payment amount
-    final validation = _validatePayment(payment);
-    if (validation.isLeft()) {
-      return validation;
+    if (_processing) {
+      return left(const PaymentValidationFailure('Ya hay un cobro en curso'));
     }
-
+    _processing = true;
     try {
       // Get cart items
       final cartItemsResult = await cartRepository.getItems();
       if (cartItemsResult.isLeft()) {
-        return left(CartOperationFailure('get_items', 
-          message: 'Failed to get cart items'));
+        return left(cartItemsResult.getLeft().toNullable()!);
       }
       final cartItems = cartItemsResult.getOrElse(() => []);
 
@@ -60,9 +60,17 @@ class ProcessPayment {
       final discountResult = await cartRepository.getDiscount();
       final totalResult = await cartRepository.getTotal();
 
-      final subtotal = subtotalResult.getOrElse(() => 0.0);
-      final discount = discountResult.getOrElse(() => 0.0);
-      final total = totalResult.getOrElse(() => 0.0);
+      for (final result in [subtotalResult, discountResult, totalResult]) {
+        if (result.isLeft()) return left(result.getLeft().toNullable()!);
+      }
+      final subtotal = subtotalResult.getOrElse(() => throw StateError('Missing subtotal'));
+      final discount = discountResult.getOrElse(() => throw StateError('Missing discount'));
+      final total = totalResult.getOrElse(() => throw StateError('Missing total'));
+      if (![subtotal, discount, total].every((value) => value.isFinite && value >= 0)) {
+        return left(const PaymentValidationFailure('El carrito contiene importes inválidos'));
+      }
+      final validation = _validatePayment(payment, total);
+      if (validation.isLeft()) return left(validation.getLeft().toNullable()!);
 
       // Create sale items from cart items
       final saleItems = cartItems.map((cartItem) {
@@ -81,7 +89,7 @@ class ProcessPayment {
       double? change;
       if (payment.method == PaymentMethod.cash || 
           payment.method == PaymentMethod.mixed) {
-        change = payment.change;
+        change = ((payment.totalReceived * 100).round() - (total * 100).round()) / 100;
       }
 
       // Create Sale entity
@@ -117,23 +125,37 @@ class ProcessPayment {
     } catch (e) {
       return left(SaleCreationFailure(
         message: 'Failed to process payment: ${e.toString()}',
-        exception: e as Exception?,
+        exception: e is Exception ? e : Exception(e.toString()),
       ));
+    } finally {
+      _processing = false;
     }
   }
 
   /// Validates payment amount
-  Either<Failure, Unit> _validatePayment(Payment payment) {
-    final totalReceived = payment.totalReceived;
-    
-    if (totalReceived < payment.totalAmount) {
-      return left(const PaymentValidationFailure(
-        'Insufficient payment amount',
-      ));
+  Either<Failure, Unit> _validatePayment(Payment payment, double cartTotal) {
+    final amounts = [payment.totalAmount, payment.amountReceived, payment.cardAmount ?? 0];
+    if (!amounts.every((value) => value.isFinite && value >= 0)) {
+      return left(const PaymentValidationFailure('El pago contiene importes inválidos'));
     }
-
+    final totalCents = (cartTotal * 100).round();
+    if ((payment.totalAmount * 100).round() != totalCents) {
+      return left(const PaymentValidationFailure('El total cambió. Revisa el carrito antes de cobrar'));
+    }
+    if ((payment.totalReceived * 100).round() < totalCents) {
+      return left(const PaymentValidationFailure('El importe recibido es insuficiente'));
+    }
+    if (payment.method == PaymentMethod.cash && (payment.cardAmount ?? 0) != 0) {
+      return left(const PaymentValidationFailure('Un pago en efectivo no admite importe de tarjeta'));
+    }
+    if (payment.method == PaymentMethod.card &&
+        ((payment.cardAmount ?? 0) != 0 || (payment.amountReceived * 100).round() != totalCents)) {
+      return left(const PaymentValidationFailure('El pago con tarjeta debe coincidir con el total'));
+    }
+    if (payment.method == PaymentMethod.mixed &&
+        ((payment.cardAmount ?? 0) * 100).round() > totalCents) {
+      return left(const PaymentValidationFailure('La parte de tarjeta no puede superar el total'));
+    }
     return right(unit);
   }
 }
-
-// Payment already processed or cart is empty

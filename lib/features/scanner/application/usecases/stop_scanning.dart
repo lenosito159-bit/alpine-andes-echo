@@ -12,7 +12,7 @@ class StopScanning {
 
   const StopScanning(this.scannerPort);
 
-  Either<Failure, Unit> execute() {
+  Future<Either<Failure, Unit>> execute() {
     return scannerPort.stopScanning();
   }
 }

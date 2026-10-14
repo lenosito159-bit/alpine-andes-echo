@@ -1,165 +1,102 @@
-import 'package:fpdart/fpdart.dart';
-import 'package:mobile_scanner/mobile_scanner.dart' as ms;
 import 'dart:async';
 
+import 'package:fpdart/fpdart.dart';
+import 'package:mobile_scanner/mobile_scanner.dart' as ms;
 import 'package:zivlo/core/error/failures.dart';
 import 'package:zivlo/core/domain/value_objects/barcode_format.dart';
 import 'package:zivlo/features/scanner/domain/entities/scan_result.dart';
 import 'package:zivlo/features/scanner/domain/ports/scanner_port.dart';
-/// Mobile Scanner Adapter
-/// Implementation of IScannerPort using the mobile_scanner package v5.1.1
-/// Handles camera operations, barcode detection, and flash control
+
+/// Owns the same controller used by the camera preview. Stopping the camera
+/// pauses detection; only dispose closes the results stream permanently.
 class MobileScannerAdapter implements IScannerPort {
-  final ms.MobileScannerController _controller;
-  final _scanResultsController =
-      StreamController<Either<Failure, ScanResult>>.broadcast();
+  final ms.MobileScannerController controller;
+  final _results = StreamController<Either<Failure, ScanResult>>.broadcast();
+  StreamSubscription<ms.BarcodeCapture>? _subscription;
 
-  /// Creates a new MobileScannerAdapter
-  ///
-  /// Optionally accepts a [controller] for testing purposes.
-  /// If not provided, a default MobileScannerController is created.
   MobileScannerAdapter({ms.MobileScannerController? controller})
-      : _controller = controller ?? ms.MobileScannerController();
+      : controller = controller ?? ms.MobileScannerController(autoStart: false);
 
   @override
-  Either<Failure, Unit> startScanning() {
+  Future<Either<Failure, Unit>> startScanning() async {
     try {
-      // Start the camera with barcode callback
-      _controller.start();
-
-      // Listen to barcode events using onDetect callback (v5.x API)
-      _controller.addListener(() {
-        final barcodes = _controller.barcodes;
-        if (barcodes.isNotEmpty) {
-          final barcode = barcodes.first;
-          final rawValue = barcode.rawValue;
-
-          // Skip empty barcodes
-          if (rawValue == null || rawValue.isEmpty) {
-            return;
-          }
-
-          final scanResult = ScanResult(
-            barcode: rawValue,
+      _subscription ??= controller.barcodes.listen((capture) {
+        for (final barcode in capture.barcodes) {
+          final value = barcode.rawValue;
+          if (value == null || value.trim().isEmpty || _results.isClosed) continue;
+          _results.add(right(ScanResult(
+            barcode: value,
             format: _mapBarcodeFormat(barcode.format),
-            product: null, // Product is looked up in the use case
+            product: null,
             scannedAt: DateTime.now(),
-          );
-          _scanResultsController.add(Right(scanResult));
+          )));
+          break;
         }
+      }, onError: (Object error) {
+        if (!_results.isClosed) _results.add(left(_failure(error)));
       });
-
+      await controller.start();
+      final error = controller.value.error;
+      if (error != null) return left(_failure(error));
       return right(unit);
-    } on ms.MobileScannerException catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to start scanner: ${e.toString()}',
-        exception: e,
-      ));
-    } catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to start scanner: ${e.toString()}',
-        exception: e as Exception,
-      ));
+    } catch (error) {
+      return left(_failure(error));
     }
   }
 
   @override
-  Either<Failure, Unit> stopScanning() {
+  Future<Either<Failure, Unit>> stopScanning() async {
     try {
-      // Stop the camera
-      _controller.stop();
+      await _subscription?.cancel();
+      _subscription = null;
+      await controller.stop();
+      return right(unit);
+    } catch (error) {
+      return left(_failure(error));
+    }
+  }
 
-      // Close the stream controller
-      if (!_scanResultsController.isClosed) {
-        _scanResultsController.close();
+  @override
+  Stream<Either<Failure, ScanResult>> get scanResults => _results.stream;
+
+  @override
+  Future<Either<Failure, Unit>> toggleFlash(bool enabled) async {
+    try {
+      final state = controller.value.torchState;
+      if (state == ms.TorchState.unavailable) {
+        return left(const ScannerFailure(message: 'La cámara no dispone de flash'));
       }
-
+      if ((state == ms.TorchState.on) != enabled) await controller.toggleTorch();
       return right(unit);
-    } on ms.MobileScannerException catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to stop scanner: ${e.toString()}',
-        exception: e,
-      ));
-    } catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to stop scanner: ${e.toString()}',
-        exception: e as Exception,
-      ));
+    } catch (error) {
+      return left(_failure(error));
     }
   }
 
   @override
-  Stream<Either<Failure, ScanResult>> get scanResults => _scanResultsController.stream;
+  Either<Failure, bool> isFlashAvailable() =>
+      right(controller.value.torchState != ms.TorchState.unavailable);
 
-  @override
-  Either<Failure, Unit> toggleFlash(bool enabled) {
-    try {
-      // Check if torch is available before toggling (v5.x API)
-      if (!_controller.torchEnabled) {
-        return Left(ScannerFailure(
-          message: 'Device does not have a flash',
-        ));
-      }
-
-      // Use setTorchState instead of toggleFlashlight (v5.x API)
-      _controller.setTorchState(enabled ? ms.TorchMode.on : ms.TorchMode.off);
-      return right(unit);
-    } on ms.MobileScannerException catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to toggle flash: ${e.toString()}',
-        exception: e,
-      ));
-    } catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to toggle flash: ${e.toString()}',
-        exception: e as Exception,
-      ));
-    }
+  Future<void> dispose() async {
+    await stopScanning();
+    await _results.close();
+    await controller.dispose();
   }
 
-  @override
-  Either<Failure, bool> isFlashAvailable() {
-    try {
-      final hasTorch = _controller.torchEnabled;
-      return Right(hasTorch);
-    } on ms.MobileScannerException catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to check flash availability: ${e.toString()}',
-        exception: e,
-      ));
-    } catch (e) {
-      return Left(ScannerFailure(
-        message: 'Failed to check flash availability: ${e.toString()}',
-        exception: e as Exception,
-      ));
-    }
-  }
+  ScannerFailure _failure(Object error) => ScannerFailure(
+        message: 'No se pudo usar la cámara: $error',
+        exception: error is Exception ? error : Exception(error.toString()),
+      );
 
-  /// Maps ms.BarcodeFormat to our BarcodeFormat enum
   BarcodeFormat _mapBarcodeFormat(ms.BarcodeFormat format) {
     switch (format) {
-      case ms.BarcodeFormat.ean13:
-        return BarcodeFormat.ean13;
-      case ms.BarcodeFormat.ean8:
-        return BarcodeFormat.ean8;
-      case ms.BarcodeFormat.qrCode:
-        return BarcodeFormat.qrCode;
-      case ms.BarcodeFormat.code128:
-        return BarcodeFormat.code128;
-      case ms.BarcodeFormat.code39:
-        return BarcodeFormat.code39;
-      case ms.BarcodeFormat.upcA:
-        return BarcodeFormat.upcA;
-      case ms.BarcodeFormat.upcE:
-        return BarcodeFormat.upcA; // Treat UPC-E as UPC-A
-      case ms.BarcodeFormat.codabar:
-      case ms.BarcodeFormat.itf:
-      case ms.BarcodeFormat.dataMatrix:
-      case ms.BarcodeFormat.aztec:
-      case ms.BarcodeFormat.pdf417:
-      case ms.BarcodeFormat.unknown:
-      default:
-        return BarcodeFormat.unknown;
+      case ms.BarcodeFormat.ean13: return BarcodeFormat.ean13;
+      case ms.BarcodeFormat.ean8: return BarcodeFormat.ean8;
+      case ms.BarcodeFormat.qrCode: return BarcodeFormat.qrCode;
+      case ms.BarcodeFormat.code128: return BarcodeFormat.code128;
+      case ms.BarcodeFormat.code39: return BarcodeFormat.code39;
+      case ms.BarcodeFormat.upcA: return BarcodeFormat.upcA;
+      default: return BarcodeFormat.unknown;
     }
   }
 }

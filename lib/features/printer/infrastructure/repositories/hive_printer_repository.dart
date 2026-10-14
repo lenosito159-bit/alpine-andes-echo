@@ -1,150 +1,100 @@
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:zivlo/core/error/failures.dart';
 import 'package:zivlo/features/printer/domain/entities/printer_device.dart';
 import 'package:zivlo/features/printer/infrastructure/models/printer_device_hive_model.dart';
 
-/// Hive Printer Repository
-/// Stores printer settings and preferences in Hive
-///
-/// This repository handles:
-/// - Default printer storage
-/// - Recently connected printers list
-/// - Printer configuration persistence
+/// Preferences stay compatible with the original typed printer_settings box.
+/// Each recent printer has its own key; a List cannot be stored in this box.
 class HivePrinterRepository {
-  static const String _boxName = 'printer_settings';
-  static const String _defaultPrinterKey = 'default_printer';
-  static const String _recentPrintersKey = 'recent_printers';
+  static const _boxName = 'printer_settings';
+  static const _defaultPrinterKey = 'default_printer';
+  static const _recentPrefix = 'recent_printer_';
+  Box<PrinterDeviceHiveModel>? _box;
 
-  Box<dynamic>? _box;
+  Box<PrinterDeviceHiveModel> get _settings =>
+      _box ?? Hive.box<PrinterDeviceHiveModel>(_boxName);
 
-  /// Initializes the Hive box
   Future<void> initialize() async {
-    try {
+    if (Hive.isBoxOpen(_boxName)) {
+      _box = Hive.box<PrinterDeviceHiveModel>(_boxName);
+    } else {
       _box = await Hive.openBox<PrinterDeviceHiveModel>(_boxName);
-    } catch (e) {
-      print('Failed to initialize printer settings box: $e');
-      rethrow;
     }
   }
 
-  /// Saves a printer as the default printer
   Future<bool> saveDefaultPrinter(PrinterDevice printer) async {
     try {
-      await _box?.put(_defaultPrinterKey, PrinterDeviceHiveModel.fromEntity(printer));
+      await _settings.put(_defaultPrinterKey, PrinterDeviceHiveModel.fromEntity(printer));
       return true;
-    } catch (e) {
-      print('Failed to save default printer: $e');
+    } catch (_) {
       return false;
     }
   }
 
-  /// Gets the default printer
-  Future<PrinterDevice?> getDefaultPrinter() async {
-    try {
-      final model = _box?.get(_defaultPrinterKey) as PrinterDeviceHiveModel?;
-      return model?.toEntity();
-    } catch (e) {
-      print('Failed to get default printer: $e');
-      return null;
-    }
-  }
+  Future<PrinterDevice?> getDefaultPrinter() async =>
+      _settings.get(_defaultPrinterKey)?.toEntity();
 
-  /// Removes the default printer setting
   Future<bool> clearDefaultPrinter() async {
     try {
-      await _box?.delete(_defaultPrinterKey);
+      await _settings.delete(_defaultPrinterKey);
       return true;
-    } catch (e) {
-      print('Failed to clear default printer: $e');
+    } catch (_) {
       return false;
     }
   }
 
-  /// Adds a printer to the recently connected list
   Future<bool> addRecentPrinter(PrinterDevice printer) async {
     try {
       final recent = await getRecentPrinters();
-      
-      // Remove if already exists
-      recent.removeWhere((p) => p.address == printer.address);
-      
-      // Add to front
+      recent.removeWhere((entry) => entry.address == printer.address);
       recent.insert(0, printer.copyWith(isConnected: false));
-      
-      // Keep only last 5
-      if (recent.length > 5) {
-        recent.removeRange(5, recent.length);
-      }
-
-      // Save to Hive
-      final models = recent.map((p) => PrinterDeviceHiveModel.fromEntity(p)).toList();
-      await _box?.put(_recentPrintersKey, models);
-      
+      await _writeRecent(recent.take(5).toList());
       return true;
-    } catch (e) {
-      print('Failed to add recent printer: $e');
+    } catch (_) {
       return false;
     }
   }
 
-  /// Gets the list of recently connected printers
-  Future<List<PrinterDevice>> getRecentPrinters() async {
-    try {
-      final models = _box?.get(_recentPrintersKey) as List<dynamic>?;
-      if (models == null) return [];
+  Future<List<PrinterDevice>> getRecentPrinters() async => [
+        for (var index = 0; index < 5; index++)
+          if (_settings.get('$_recentPrefix$index') case final model?) model.toEntity(),
+      ];
 
-      return models
-          .whereType<PrinterDeviceHiveModel>()
-          .map((m) => m.toEntity())
-          .toList();
-    } catch (e) {
-      print('Failed to get recent printers: $e');
-      return [];
-    }
+  Future<void> _writeRecent(List<PrinterDevice> recent) async {
+    await _settings.putAll({
+      for (var index = 0; index < recent.length; index++)
+        '$_recentPrefix$index': PrinterDeviceHiveModel.fromEntity(recent[index]),
+    });
+    await _settings.deleteAll([
+      for (var index = recent.length; index < 5; index++) '$_recentPrefix$index',
+    ]);
   }
 
-  /// Clears the recent printers list
   Future<bool> clearRecentPrinters() async {
     try {
-      await _box?.delete(_recentPrintersKey);
+      await _writeRecent([]);
       return true;
-    } catch (e) {
-      print('Failed to clear recent printers: $e');
+    } catch (_) {
       return false;
     }
   }
 
-  /// Updates the connection status of a printer
   Future<bool> updatePrinterConnectionStatus(String address, bool isConnected) async {
     try {
-      // Update default printer if matches
-      final defaultPrinter = await getDefaultPrinter();
-      if (defaultPrinter?.address == address) {
-        await saveDefaultPrinter(defaultPrinter!.copyWith(isConnected: isConnected));
+      final printer = await getDefaultPrinter();
+      if (printer != null && printer.address == address &&
+          !await saveDefaultPrinter(printer.copyWith(isConnected: isConnected))) {
+        return false;
       }
-
-      // Update recent printers
       final recent = await getRecentPrinters();
-      final index = recent.indexWhere((p) => p.address == address);
-      if (index != -1) {
-        recent[index] = recent[index].copyWith(isConnected: isConnected);
-        final models = recent.map((p) => PrinterDeviceHiveModel.fromEntity(p)).toList();
-        await _box?.put(_recentPrintersKey, models);
-      }
-
+      await _writeRecent([
+        for (final item in recent)
+          item.address == address ? item.copyWith(isConnected: isConnected) : item,
+      ]);
       return true;
-    } catch (e) {
-      print('Failed to update printer connection status: $e');
+    } catch (_) {
       return false;
     }
   }
 
-  /// Closes the Hive box
-  Future<void> close() async {
-    try {
-      await _box?.close();
-    } catch (e) {
-      print('Failed to close printer settings box: $e');
-    }
-  }
+  Future<void> close() async => _box?.close();
 }

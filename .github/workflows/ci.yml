@@ -1,74 +1,41 @@
-name: CI/CD
-
+name: Validate Zivlo Perú
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main]
-
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  # Job de análisis estático
-  analyze:
-    name: Analyze
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    
+    timeout-minutes: 25
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          flutter-version: '3.x'
-          channel: 'stable'
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: stable
           cache: true
-      
-      - name: Get dependencies
+      - name: Prepare Android without overwriting application source
+        run: bash scripts/prepare-android.sh
+      - name: Resolve compatible dependencies
         run: flutter pub get
-      
-      - name: Initialize Android project
-        run: bash scripts/init-android.sh
-      
-      - name: Run flutter analyze
+      - name: Analyze all Dart source
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-      # Formatting check disabled - format locally with: flutter format .
-      # - name: Check formatting
-      #   run: dart format --output=none --set-exit-if-changed .
-
-  # Job de tests unitarios
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: analyze
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - name: Domain, SQLite, migration, BLoC and widget tests
+        run: flutter test --coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          flutter-version: '3.x'
-          channel: 'stable'
-          cache: true
-      
-      - name: Get dependencies
-        run: flutter pub get
-      
-      - name: Run unit tests
-        run: flutter test test/unit/ --coverage --coverage-path=coverage/lcov.info
-      
-      - name: Run BLoC tests
-        run: flutter test test/bloc/ --coverage --coverage-path=coverage/lcov.info
-      
-      - name: Upload coverage to Codecov (optional)
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage/lcov.info
-          flags: unittests
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          name: zivlo-test-coverage
+          path: coverage/lcov.info
+          if-no-files-found: ignore

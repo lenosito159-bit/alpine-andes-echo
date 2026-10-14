@@ -12,11 +12,11 @@ abstract class IScannerPort {
   /// Starts the barcode scanning process
   /// Returns [Unit.value] on success, or a [Failure] if scanning cannot be started
   /// (e.g., camera permission denied, camera unavailable)
-  Either<Failure, Unit> startScanning();
+  Future<Either<Failure, Unit>> startScanning();
 
   /// Stops the barcode scanning process
   /// Returns [Unit.value] on success, or a [Failure] if stopping fails
-  Either<Failure, Unit> stopScanning();
+  Future<Either<Failure, Unit>> stopScanning();
 
   /// Stream of scan results
   /// Emits a new [ScanResult] each time a barcode is successfully scanned
@@ -27,7 +27,7 @@ abstract class IScannerPort {
   /// [enabled] - true to turn on flash, false to turn off
   /// Returns [Unit.value] on success, or a [Failure] if flash control fails
   /// (e.g., device has no flash, flash hardware error)
-  Either<Failure, Unit> toggleFlash(bool enabled);
+  Future<Either<Failure, Unit>> toggleFlash(bool enabled);
 
   /// Checks if the device has a flash available
   /// Returns [true] if flash is available, [false] otherwise

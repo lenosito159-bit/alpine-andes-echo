@@ -48,7 +48,7 @@ class Product extends Equatable {
   bool get isValid {
     return name.trim().isNotEmpty &&
            name.length <= 60 &&
-           price >= 0 &&
+           price.isFinite && price >= 0 &&
            stock >= 0;
   }
   

@@ -20,7 +20,11 @@ class HiveCheckoutRepository implements ICheckoutRepository {
   /// Opens the Hive box for sales
   /// Must be called before using the repository
   Future<void> initialize() async {
-    _box = await Hive.openBox<SaleHiveModel>(_boxName);
+    if (Hive.isBoxOpen(_boxName)) {
+      _box = Hive.box<SaleHiveModel>(_boxName);
+    } else {
+      _box = await Hive.openBox<SaleHiveModel>(_boxName);
+    }
   }
 
   @override

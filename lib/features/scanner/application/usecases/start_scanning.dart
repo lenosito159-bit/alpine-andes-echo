@@ -12,7 +12,7 @@ class StartScanning {
 
   const StartScanning(this.scannerPort);
 
-  Either<Failure, Unit> execute() {
+  Future<Either<Failure, Unit>> execute() {
     return scannerPort.startScanning();
   }
 }

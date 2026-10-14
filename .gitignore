@@ -3,7 +3,6 @@
 .packages
 build/
 .pub/
-pubspec.lock
 pubspec_overrides.yaml
 
 # Test por defecto de Flutter
@@ -119,6 +118,8 @@ temp/
 # Package manager
 .pnpm-store/
 node_modules/
+pilot/test-results/
+pilot/dist/
 
 # Documentation generated
 docs/api/

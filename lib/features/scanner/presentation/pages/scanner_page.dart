@@ -1,18 +1,13 @@
+import 'dart:async';
+import 'package:zivlo/injection_container.dart';
+import 'package:zivlo/features/scanner/domain/entities/scan_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:zivlo/core/theme/app_theme.dart';
-import 'package:zivlo/features/catalog/infrastructure/models/product_hive_model.dart';
-import 'package:zivlo/features/catalog/infrastructure/repositories/hive_product_repository.dart';
-import 'package:zivlo/features/scanner/domain/ports/scanner_port.dart';
 import 'package:zivlo/features/scanner/infrastructure/adapters/mobile_scanner_adapter.dart';
-import 'package:zivlo/features/scanner/application/usecases/start_scanning.dart';
-import 'package:zivlo/features/scanner/application/usecases/stop_scanning.dart';
-import 'package:zivlo/features/scanner/application/usecases/handle_scan_result.dart';
-import 'package:zivlo/features/scanner/application/usecases/lookup_product_by_barcode.dart';
 import 'package:zivlo/features/scanner/presentation/bloc/scanner_bloc.dart';
 import 'package:zivlo/features/scanner/presentation/bloc/scanner_event.dart';
 import 'package:zivlo/features/scanner/presentation/bloc/scanner_state.dart';
@@ -44,41 +39,16 @@ class _ScannerPageState extends State<ScannerPage> {
   void initState() {
     super.initState();
 
-    // Create the MobileScannerAdapter (infrastructure)
-    final scannerAdapter = MobileScannerAdapter();
-
-    // Create product repository for lookup
-    // Get the products box from Hive (must be initialized in main.dart)
-    final productBox = Hive.box<ProductHiveModel>('products');
-    final productRepository = HiveProductRepository(productBox);
-
-    // Create use cases
-    final startScanning = StartScanning(scannerAdapter);
-    final stopScanning = StopScanning(scannerAdapter);
-    final lookupProduct = LookupProductByBarcode(productRepository);
-    final handleScanResult = HandleScanResult(lookupProduct);
-
-    // Create BLoC with dependencies
-    _scannerBloc = ScannerBloc(
-      startScanning: startScanning,
-      stopScanning: stopScanning,
-      handleScanResult: handleScanResult,
-      scannerPort: scannerAdapter,
-    );
-
-    // Create camera controller for preview
-    _cameraController = MobileScannerController();
-
-    // Dispatch ScannerStarted event
-    _scannerBloc.add(const ScannerStarted());
+    _scannerBloc = sl<ScannerBloc>();
+    _cameraController = (_scannerBloc.scannerPort as MobileScannerAdapter).controller;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scannerBloc.add(const ScannerStarted());
+    });
   }
 
   @override
   void dispose() {
-    // Stop scanning and dispose BLoC
-    _scannerBloc.add(const ScannerStopped());
-    _scannerBloc.close();
-    _cameraController.dispose();
+    unawaited(_scannerBloc.close());
     super.dispose();
   }
 
@@ -90,15 +60,12 @@ class _ScannerPageState extends State<ScannerPage> {
         backgroundColor: AppColors.colorBackground,
         body: Stack(
           children: [
+            _buildScannerListener(),
             // Camera preview (full-screen)
             Positioned.fill(
               child: MobileScanner(
                 controller: _cameraController,
-                onDetect: (capture) {
-                  // Barcode detection is handled by the BLoC
-                  // through the scannerPort.scanResults stream
-                },
-                errorBuilder: (context, error) {
+                errorBuilder: (context, error, child) {
                   return _buildErrorWidget(error);
                 },
               ),
@@ -169,6 +136,10 @@ class _ScannerPageState extends State<ScannerPage> {
         } else if (state is ScannerProductNotFound) {
           // Show product not found dialog
           _showProductNotFoundDialog(state.barcode);
+        } else if (state is ScannerCartUpdated) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${state.quantity} × ${state.productName} agregado al carrito'),
+          ));
         } else if (state is ScannerErrorState) {
           // Show error snackbar
           _showErrorSnackbar(state.message);
@@ -179,31 +150,33 @@ class _ScannerPageState extends State<ScannerPage> {
   }
 
   /// Show product found bottom sheet
-  void _showProductFoundBottomSheet(ScanResult result) {
-    showModalBottomSheet(
+  Future<void> _showProductFoundBottomSheet(ScanResult result) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return ScanResultBottomSheet(
-          result: result,
-          onContinueScanning: () {
-            Navigator.pop(context);
-            // Resume scanning is automatic
-          },
+        return BlocProvider.value(
+          value: _scannerBloc,
+          child: ScanResultBottomSheet(
+            result: result,
+            onContinueScanning: () => Navigator.pop(context),
+          ),
         );
       },
     );
+    if (mounted) _scannerBloc.add(const ScannerStarted());
   }
 
   /// Show product not found dialog
-  void _showProductNotFoundDialog(String barcode) {
-    showDialog(
+  Future<void> _showProductNotFoundDialog(String barcode) async {
+    await showDialog(
       context: context,
       builder: (context) {
         return ProductNotFoundDialog(barcode: barcode);
       },
     );
+    if (mounted) _scannerBloc.add(const ScannerStarted());
   }
 
   /// Show error snackbar
@@ -242,7 +215,7 @@ class _ScannerPageState extends State<ScannerPage> {
             ),
             const SizedBox(height: AppSpacing.spacing8),
             Text(
-              error.message ?? 'No se pudo acceder a la cámara',
+              error.errorDetails?.message ?? 'No se pudo acceder a la cámara',
               style: AppTypography.textTheme.bodyMedium?.copyWith(
                 color: AppColors.colorOnSurfaceMuted,
               ),
