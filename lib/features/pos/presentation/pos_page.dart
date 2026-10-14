@@ -284,9 +284,9 @@ class _PosPageState extends State<PosPage> {
         const SizedBox(height: 12),
         Text(product['name'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
         const Spacer(),
-        Text(soles(product['price'] as int), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _green)),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(soles(product['price'] as int), maxLines: 1, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _green))),
         const SizedBox(height: 4),
-        Text(available ? '${displayQuantity(stock, product['unit'].toString())} disponibles' : 'Sin stock', style: TextStyle(fontSize: 11, color: available ? _muted : Colors.red.shade800)),
+        Text(available ? '${displayQuantity(stock, product['unit'].toString())} disponibles' : 'Sin stock', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: available ? _muted : Colors.red.shade800)),
       ])),
     ));
   }
@@ -605,7 +605,8 @@ class _PosPageState extends State<PosPage> {
   Future<bool> _dialog({required String title, required Widget Function(StateSetter) content, required Future<bool> Function() submit, String confirm = 'Guardar', String? confirmKey}) async {
     var saving = false;
     String? error;
-    return await showDialog<bool>(context: context, barrierDismissible: false, builder: (dialogContext) => StatefulBuilder(builder: (context, refresh) => PopScope(canPop: !saving, child: AlertDialog(
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final route = DialogRoute<bool>(context: context, barrierDismissible: false, builder: (dialogContext) => StatefulBuilder(builder: (context, refresh) => PopScope(canPop: !saving, child: AlertDialog(
       title: Text(title),
       content: SizedBox(width: 460, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [AbsorbPointer(absorbing: saving, child: content(refresh)), if (error != null) ...[const SizedBox(height: 16), Text(error!, style: const TextStyle(color: Color(0xFF8C342B)))]]))),
       actions: [TextButton(onPressed: saving ? null : () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')), FilledButton(key: confirmKey == null ? null : ValueKey(confirmKey), onPressed: saving ? null : () async {
@@ -616,7 +617,12 @@ class _PosPageState extends State<PosPage> {
         if (!dialogContext.mounted) return;
         if (success) { Navigator.pop(dialogContext, true); } else { refresh(() => saving = false); }
       }, child: Text(saving ? 'Guardando…' : confirm))],
-    )))) ?? false;
+    ))));
+    final result = await navigator.push(route);
+    // The pop result arrives before the closing animation removes TextFields.
+    // Keep their controllers alive until the route's widgets are disposed.
+    await route.completed;
+    return result ?? false;
   }
 }
 

@@ -84,7 +84,9 @@ void main() {
   test('price edits preserve the agreed cart and original receipt', () {
     var s = ready(); var p = Map<String, dynamic>.from(s.products[1]); p['price'] = 1500;
     s = engine.dispatch(s, {'type': 'save-product', 'product': p}); expect(s.total, 950);
-    s = pay(s, [{'method': 'cash', 'amount': 950}]); p['name'] = 'Aceite renombrado';
+    s = pay(s, [{'method': 'cash', 'amount': 950}]);
+    p = Map<String, dynamic>.from(s.products[1]);
+    p['name'] = 'Aceite renombrado';
     s = engine.dispatch(s, {'type': 'save-product', 'product': p});
     expect((s.sales.single['lines'] as List).single['name'], 'Aceite vegetal 1 L');
     expect(s.sales.single['total'], 950);
