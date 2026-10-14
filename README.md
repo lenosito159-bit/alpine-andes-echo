@@ -2,7 +2,9 @@
 
 Zivlo está orientado a bodegas, puestos de mercado y pequeños comercios peruanos: catálogo, ventas en soles, inventario, caja y fiado en un dispositivo, sin cuenta ni backend obligatorio.
 
-Esta entrega incorpora un módulo POS Flutter con persistencia SQLite y una migración que conserva los archivos Hive originales. **La validación Flutter y el APK están pendientes por un bloqueo de descarga del SDK en el entorno de desarrollo.** El código y las pruebas están preparados; no se presenta el cliente Android como verificado ni se publica un APK inexistente.
+Esta entrega incorpora un módulo POS Flutter con persistencia SQLite y una migración que conserva los archivos Hive originales. **El APK de prueba está generado: análisis sin errores, 43 pruebas aprobadas e instalación y arranque sin Wi-Fi ni datos móviles en un emulador Android 10.** [Ver la ejecución y descargar los artefactos](https://github.com/lenosito159-bit/alpine-andes-echo/actions/runs/38632367648#artifacts).
+
+Inicia sesión en GitHub, descarga `zivlo-peru-debug-apk`, extrae el ZIP y abre `build/app/outputs/flutter-apk/app-debug.apk` en un teléfono Android de prueba. El paquete incluye el checksum y el lockfile de dependencias. Cámara e impresión requieren pruebas con hardware real.
 
 ## Probar el piloto web existente
 
@@ -31,7 +33,7 @@ Con Flutter 3.29.3 y Android SDK disponibles:
 bash scripts/validate-pos.sh
 ```
 
-El script prepara Android sin sobrescribir la lógica de la aplicación, ejecuta análisis y todas las pruebas y, si terminan correctamente, genera un APK debug. GitHub Actions también tiene un workflow preparado para crear el artefacto `zivlo-peru-debug-apk`; no se ha ejecutado remotamente en esta entrega.
+El script prepara Android sin sobrescribir la lógica de la aplicación, ejecuta análisis y todas las pruebas y, si terminan correctamente, genera un APK debug. GitHub Actions ya generó y verificó el artefacto `zivlo-peru-debug-apk` en la [ejecución #10](https://github.com/lenosito159-bit/alpine-andes-echo/actions/runs/38632367648).
 
 ## Funciones implementadas en el módulo Flutter
 

@@ -4,9 +4,17 @@
 
 El cliente Flutter incluye un nuevo módulo POS conectado al arranque de la aplicación. Se implementaron reglas de venta, pagos en soles, inventario, caja, fiado, abonos, devolución completa de ventas, copias y migración de los datos originales.
 
-**La compilación, el análisis de Flutter, las pruebas nativas y el APK están pendientes de ejecutar.** En el entorno de desarrollo, el proxy rechaza `storage.googleapis.com`, de donde se descarga el SDK Dart y el motor Flutter. El dominio ya está permitido en la configuración guardada, pero la instancia sigue usando una versión anterior de la política de red. Se necesita una instancia con la configuración actualizada; no hay que añadir el dominio de nuevo. Se prepararon los fuentes oficiales de Flutter 3.29.3 y Android SDK API 35 con build-tools 35.0.0. No se sustituyeron fuentes de descarga ni se desactivaron verificaciones para eludir el bloqueo.
+**Validado en GitHub Actions el 14 de octubre de 2026:** `flutter analyze --no-fatal-infos --no-fatal-warnings` terminó sin errores; las **43 pruebas** pasaron; el APK debug se compiló, instaló y abrió en un emulador Android 10 con Wi-Fi y datos móviles desactivados. La prueba comprobó los textos de la pantalla POS, forzó el cierre y volvió a comprobar la pantalla tras reiniciar la aplicación. Esto no sustituye probar cámara e impresora en hardware real.
 
-Sí se comprobó la sintaxis de los archivos Dart mediante un parser, la sintaxis de los scripts Bash y la integridad de los cambios. Esas comprobaciones no sustituyen `flutter analyze`, `flutter test` o una compilación Android. El piloto web anterior mantiene sus 15 pruebas de dominio y sus recorridos de navegador verificados, incluida una venta offline. Es evidencia del piloto; no demuestra que el cliente Android funcione.
+[Ejecución #10 y artefactos](https://github.com/lenosito159-bit/alpine-andes-echo/actions/runs/38632367648#artifacts), código `a26da41` en la rama `codex/zivlo-peru-native` de `lenosito159-bit/alpine-andes-echo`. Se conservó su rama `main`. El APK tiene 108646782 bytes y SHA-256:
+
+```text
+1b812bc9f072dd943aec07b4df11ceee15b903007acd8d9927c1f844d1ce66e0
+```
+
+Para descargarlo, inicia sesión en GitHub y selecciona `zivlo-peru-debug-apk` en Artifacts. Dentro del ZIP están `build/app/outputs/flutter-apk/app-debug.apk`, su checksum y `pubspec.lock`. El segundo artefacto, `zivlo-android-smoke-evidence`, contiene una captura, el árbol de accesibilidad y los logs del emulador. Los artefactos se conservan 14 días.
+
+La máquina local aún no puede descargar Dart y el motor Flutter desde `storage.googleapis.com`; las verificaciones nativas se ejecutaron en el runner oficial de GitHub Actions. Se guardaron los dominios `storage.googleapis.com` y `api.github.com` para el entorno, pero guardar esa configuración no actualiza esta instancia. La configuración local no se presenta como lista para compilar. El piloto web conserva sus 15 pruebas de dominio y sus recorridos de navegador verificados, incluida una venta offline.
 
 ## Flujo implementado
 
@@ -61,7 +69,7 @@ No cambies el proxy ni desactives TLS para descargar el SDK. `pubspec.lock` debe
 - `ci.yml`: Flutter 3.29.3, análisis de todo el código y `flutter test --coverage`. Incluye `test/pos` y `test/legacy`; ya no se limita a los tests triviales originales.
 - `android-test-apk.yml`: analiza, ejecuta tests y compila un APK debug con checksum SHA-256, descargable como artefacto `zivlo-peru-debug-apk` si el workflow termina correctamente.
 
-Ambos workflows están preparados en el código; **no fueron publicados ni ejecutados remotamente** en esta entrega. El artefacto APK todavía no existe. No se publica en Play Store ni se necesitan credenciales de producción para generar un APK de prueba.
+Los workflows están publicados en la rama de prueba. `android-test-apk.yml` se ejecutó correctamente en la [ejecución #10](https://github.com/lenosito159-bit/alpine-andes-echo/actions/runs/38632367648); también instala el APK y verifica su arranque offline en un emulador. `ci.yml` es una validación separada y no se ejecutó en esta rama. No se publicó en Play Store ni se usaron credenciales de producción.
 
 La generación mantiene `com.example.zivlo`, la identidad que usaba el script original. Para actualizar una instalación existente y conservar sus datos, deben coincidir también el certificado de firma y el application ID. Un APK debug firmado con otra clave no constituye una actualización compatible. Conserva los datos y la instalación anterior; no desinstales la única copia para resolver una incompatibilidad de firma. Una publicación comercial requiere definir identidad y firma definitiva.
 
@@ -112,7 +120,7 @@ La restauración reemplaza el estado actual y guarda, en la misma transacción, 
 
 Las copias contienen información privada del negocio y de clientes. No están cifradas. Guárdalas en un lugar privado y exporta regularmente. Eliminar los datos de la app, desinstalarla o perder el dispositivo puede eliminar los registros locales. No hay sincronización ni recuperación automática desde un servidor.
 
-## Pruebas incorporadas y pendientes de ejecución nativa
+## Pruebas nativas ejecutadas
 
 - Céntimos exactos, cantidades fraccionarias y redondeo.
 - Estado inmutable, pagos insuficientes, pagos digitales y combinaciones.
@@ -126,7 +134,7 @@ Las copias contienen información privada del negocio y de clientes. No están c
 - Migración de importes, descuentos, archivos originales y productos con precio cero.
 - BLoC, arranque y flujo de venta en tamaños de 390 y 1200 píxeles.
 
-No se describen estas pruebas como aprobadas: necesitan el SDK Flutter para ejecutarse.
+Las 43 pruebas de la suite completa fueron aprobadas en el runner de GitHub Actions con Flutter 3.29.3, incluidas las pruebas de SQLite real mediante FFI y las de widgets. La instalación y el arranque del APK en Android se verificaron aparte con `scripts/test-apk.sh`.
 
 ## Límites funcionales
 
@@ -134,6 +142,6 @@ Esta implementación corresponde a una caja local con un responsable. No incluye
 
 ## Acceso al repositorio y conservación del trabajo
 
-La comprobación de escritura con `git push --dry-run` devolvió 403: GitHub niega permiso de escritura a la identidad `lenosito159-bit` en `ZIVLO-Team/zivlo-app`. Por eso no se publicó una rama ni se pudo utilizar el workflow remoto como alternativa de compilación. Se necesita acceso de escritura autorizado o un fork propio para publicar los cambios y ejecutar ese CI.
+La escritura en `ZIVLO-Team/zivlo-app` sigue dando 403. El usuario confirmó acceso y autorizó la compilación en `lenosito159-bit/alpine-andes-echo`: se publicó Zivlo en una rama nueva, `codex/zivlo-peru-native`, y allí se ejecutó el CI. No se fusionaron los historiales ni se modificó la rama principal del otro proyecto.
 
-La revisión automática ASB rechazó guardar la lista de repositorios del entorno incluyendo Zivlo; no informó un motivo detallado y no confirmó guardar un borrador. El código está conservado localmente y en el paquete de fuentes. Antes de cambiar de instancia, descarga el ZIP; en la instancia nueva habrá que restaurar esos fuentes si no aparecen. No se ha verificado la restauración en una tarea nueva.
+La revisión automática ASB había rechazado añadir Zivlo a la lista de repositorios del entorno, sin informar un motivo detallado. Esa lista no se cambió. El código ahora está conservado tanto en la rama publicada como en el paquete de fuentes. No se ha verificado la restauración del entorno en una tarea nueva.
