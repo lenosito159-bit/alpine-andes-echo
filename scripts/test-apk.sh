@@ -28,7 +28,7 @@ if not path.exists():
     sys.exit(1)
 root = ET.parse(path).getroot()
 text = ' '.join(n.get('text', '') + ' ' + n.get('content-desc', '') for n in root.iter())
-sys.exit(0 if 'Tu próxima venta' in text and 'Mi bodega' in text else 1)
+sys.exit(0 if 'Tu próxima venta' in text and 'Abrir caja' in text else 1)
 PY
   then
     if [ "$zivlo_verified" -eq 0 ]; then

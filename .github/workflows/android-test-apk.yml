@@ -53,8 +53,15 @@ jobs:
             python3 - <<'PY'
           import os
           from pathlib import Path
-          lines = Path(os.environ['RUNNER_TEMP'], 'zivlo-tests.log').read_text().splitlines()[-100:]
-          print('::error::' + '\n'.join(lines).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          lines = Path(os.environ['RUNNER_TEMP'], 'zivlo-tests.log').read_text().splitlines()
+          markers = ['following assertion', 'following _', 'following message', 'Expected:', 'Actual:', '[E]', 'Error:', 'Exception:']
+          details = []
+          for i, line in enumerate(lines):
+              if any(marker in line for marker in markers):
+                  details.append('\n'.join(lines[max(0, i-1):i+13]))
+          message = '\n\n'.join(details)
+          for offset in range(0, min(len(message), 30000), 3000):
+              print('::error::' + message[offset:offset+3000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
           PY
           else
             python3 - <<'PY'
@@ -67,7 +74,22 @@ jobs:
           fi
           exit "$result"
       - name: Build debug APK for testing
-        run: flutter build apk --debug
+        run: |
+          set +e
+          flutter build apk --debug > "$RUNNER_TEMP/zivlo-build.log" 2>&1
+          result=$?
+          cat "$RUNNER_TEMP/zivlo-build.log"
+          if [ "$result" -ne 0 ]; then
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = Path(os.environ['RUNNER_TEMP'], 'zivlo-build.log').read_text().splitlines()[-80:]
+          message = '\n'.join(lines)
+          for offset in range(0, min(len(message), 30000), 3000):
+              print('::error::' + message[offset:offset+3000].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
+          PY
+          fi
+          exit "$result"
       - name: Checksum
         working-directory: build/app/outputs/flutter-apk
         run: |
